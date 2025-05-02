@@ -66,6 +66,21 @@ services:
     networks:
       - flowscan-network
 
+    nginx:
+      image: nginx:latest
+      container_name: nginx
+      ports:
+        - "80:80"
+        - "443:443"
+      volumes:
+        - ./nginx/inflowcan.net.conf:/etc/nginx/conf.d/inflowcan.net.conf:ro
+        - /etc/letsencrypt:/etc/letsencrypt:ro # For SSL
+      depends_on:
+        - frontend
+        - csharp-backend
+      networks:
+        - flowscan-network
+
 networks:
   flowscan-network:
 
