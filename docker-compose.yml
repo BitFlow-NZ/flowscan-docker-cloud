@@ -1,0 +1,74 @@
+version: "3.8"
+
+services:
+  csharp-backend:
+    build: ./API
+    ports:
+      - "5002:5001"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=db;Database=${DB_NAME};User=${DB_USER};Password=${DB_PASSWORD};
+    networks:
+      - flowscan-network
+
+  image-recognition:
+    build: ./image-recognition
+    ports:
+      - "5003:5001" # Map host port 5003 to container port 5001
+    depends_on:
+      - csharp-backend # Add this dependency
+    environment:
+      - VISION_KEY=${VISION_KEY}
+      - VISION_ENDPOINT=${VISION_ENDPOINT}
+    volumes:
+      - ./image-recognition:/app
+      - cache-data:/app/cache
+    networks:
+      - flowscan-network
+
+  db:
+    image: mysql:8.0
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3307:3306" # Optional: Expose if needed locally, remove in production
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql # Optional initialization
+    networks:
+      - flowscan-network
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_ENV: ${REACT_APP_ENV}
+        REACT_APP_AWS_ACCESS_KEY_ID: ${REACT_APP_AWS_ACCESS_KEY_ID}
+        REACT_APP_AWS_SECRET_ACCESS_KEY: ${REACT_APP_AWS_SECRET_ACCESS_KEY}
+        REACT_APP_AWS_BUCKET_NAME: ${REACT_APP_AWS_BUCKET_NAME}
+        REACT_APP_AWS_REGION: ${REACT_APP_AWS_REGION}
+        REACT_APP_API_URL: ${REACT_APP_API_URL}
+        REACT_APP_IMG_URL: ${REACT_APP_IMG_URL}
+    ports:
+      - "3000:80"
+    depends_on:
+      - csharp-backend
+    networks:
+      - flowscan-network
+
+networks:
+  flowscan-network:
+
+volumes:
+  db-data:
+  cache-data:
